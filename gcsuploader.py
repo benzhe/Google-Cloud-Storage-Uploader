@@ -15,7 +15,7 @@ from google.appengine.api import files
 
 #Change this to your bucket name, and make sure your gae appkey has been added to the gcs console.
 #more detail: http://code.google.com/appengine/docs/python/googlestorage/overview.html#Prerequisites
-BUCKET = 'firstgcs'
+BUCKET = 'your-bucketname'
 
 try:
     files.gs
