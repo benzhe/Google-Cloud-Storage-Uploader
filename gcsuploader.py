@@ -78,10 +78,10 @@ class UploadPage(webapp.RequestHandler):
                     
                     files.finalize(real_filepath)
                     
-                    template_values = {
-                        'message':'Upload Success!',
-                        'origin_url':"http://commondatastorage.googleapis.com/" + filepath[4:]    
-                    }
+                    # template_values = {
+                        # 'message':'Upload Success!',
+                        # 'origin_url':"http://commondatastorage.googleapis.com/" + filepath[4:]    
+                    # }
                     
 #                    origin_url = "http://commondatastorage.googleapis.com/" + filepath[4:]
                     origin_url = 'http://'+self.request.host + '/view/' + filepath[4:]
@@ -107,10 +107,10 @@ class UploadPage(webapp.RequestHandler):
         
         
     def get(self):
-        template_values = {
-            'message':'Please Upload Something By POST!'               
-        }
-        self.out(template_values)        
+        # template_values = {
+            # 'message':'Please Upload Something By POST!'               
+        # }
+        # self.out(template_values)        
 #        path = os.path.join(os.path.dirname(__file__), 'result.html')
 #        self.response.out.write(template.render(path, template_values))
         
