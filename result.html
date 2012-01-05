@@ -1,0 +1,39 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Result</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta http-equiv="Content-Language" content="zh-CN" />
+	<style>
+		* {
+			margin:0;padding:0;
+		}
+		body{
+			width:740px;
+		}
+		p{
+			font-size:12px;
+			font-family:Verdana, Arial, Helvetica;
+			text-align:center;
+			word-break:break-all;
+			line-height:30px;
+		}
+		.r {
+			color:red;
+		}
+		.b {
+			color:blue;
+		}
+	</style>
+</head>
+<body>
+<p class="r">Result:</p>
+<p class="r">>>>{{ message }}</p>
+<p>Origin URL:</p>
+<p class="b">{{ origin_url }}</p>
+<p>Route URL:</p>
+<p class="b">{{ route_url }}</p>
+<p>24hour URL:</p>
+<p class="b">{{ 24h_url }}</p>
+</body>
+</html>

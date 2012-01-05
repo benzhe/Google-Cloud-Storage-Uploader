@@ -1,0 +1,330 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>GCS Uploader</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta http-equiv="Content-Language" content="zh-CN" />
+	<meta name="Keywords" content="" />
+	<meta name="Description" content="" />
+	<!-- <link rel="stylesheet" href="./style/style.css" type="text/css" /> -->
+	<script src="./style/jquery.js"></script>
+	<script src="./style/jquery.form.js"></script>
+	<style>
+		html,body{width:100%;height:100%;margin:0;padding:0}
+		#content {width:520px;margin:0 auto;position:relative;top:30%;}
+		form {width:300px;margin:0 auto}
+		body{font-family:Helvetica,Arial;font-size:12px}
+		body.hover{background:#eee none;}
+		#content p#status {background-color:black;color:white;padding:5px 20px;}
+		#output{background:#fff none;}
+		#output p{background:#000 none;margin:2px 0;padding:3px 0;line-height:30px;font-size:12px;color:#fff;overflow:auto;white-space:nowrap}
+		#output p font{line-height:30px;font-size:12px;color:#999;padding:0 10px}
+		#output p a{font-size:12px;color:#fff}
+    </style>
+</head>
+<body>
+<div id="content">
+<!-- 	<div id="status">Drag and Drop files to begin...</div>
+	<div id="drop-area"></div> -->
+	<form id="upload-form" action="./upload" target="message" method="POST" enctype="multipart/form-data">
+		<input type="file" multiple="multiple"  name="files" value="" />
+		<input type="submit" value="上传" />
+	</form>
+	<div id="output">
+		<p id="status">Drag and Drop files to begin...</p>
+	</div>
+	<!-- <iframe src="./upload" frameborder="0" name="message"></iframe> -->
+</div>
+
+<script type="text/javascript">
+
+$(document).ready(function(){
+
+    $('#upload-form').submit(function() {
+        // submit the form via ajax
+        $('#upload-form').ajaxSubmit({
+			beforeSubmit: function(){$('#status').text('Uploading...')},
+			dataType: 'json',
+			success: function(msg){formatjson(msg);$('#status').text('Queue Uploaded');}			
+		
+		});
+        return false;
+    });
+});
+
+function formatjson(objs){
+	//alert(objs);
+	//if(objs.length) {
+		for(var i in objs){
+			str = '<p><font>Filename:'+objs[i]['filename']+'</font><font>Result: '+objs[i]['result']+'</font><br><font>url:</font><a target="_blank" href="'+objs[i]['url']+'">'+objs[i]['url']+'</a></p>';
+			$(str).appendTo('#output');
+		
+		}
+	//}
+}
+
+function showRequest(formData, jqForm, options) { 
+    // formData is an array; here we use $.param to convert it to a string to display it 
+    // but the form plugin does this for you automatically when it submits the data 
+    var queryString = $.param(formData); 
+ 
+    // jqForm is a jQuery object encapsulating the form element.  To access the 
+    // DOM element for the form do this: 
+    // var formElement = jqForm[0]; 
+ 
+    alert('About to submit: \n\n' + queryString); 
+ 
+    // here we could return false to prevent the form from being submitted; 
+    // returning anything other than false will allow the form submit to continue 
+    return true; 
+} 
+
+function showResponse(responseText, statusText, xhr, $form)  { 
+    // for normal html responses, the first argument to the success callback 
+    // is the XMLHttpRequest object's responseText property 
+ 
+    // if the ajaxSubmit method was passed an Options Object with the dataType 
+    // property set to 'xml' then the first argument to the success callback 
+    // is the XMLHttpRequest object's responseXML property 
+ 
+    // if the ajaxSubmit method was passed an Options Object with the dataType 
+    // property set to 'json' then the first argument to the success callback 
+    // is the json data object returned by the server 
+ 
+    alert('status: ' + statusText + '\n\nresponseText: \n' + responseText + 
+        '\n\nThe output div should have already been updated with the responseText.'); 
+} 
+
+if(!XMLHttpRequest.prototype.sendAsBinary){
+  XMLHttpRequest.prototype.sendAsBinary = function(datastr) {
+    function byteValue(x) {
+      return x.charCodeAt(0) & 0xff;
+    }
+    var ords = Array.prototype.map.call(datastr, byteValue);
+    var ui8a = new Uint8Array(ords);
+    this.send(ui8a.buffer);
+  }
+}
+ 
+var up = {
+ 
+    $drop :         null,
+    queue :         [],
+    processing :    null,
+    uploading :     false,
+    binaryReader :  null,
+    dataReader :    null,
+    xhr:            null,
+ 
+    init : function() {
+        up.$drop = $('body');
+ 
+        up.$drop.bind('dragenter',up.enter);
+        up.$drop.bind('dragleave',up.leave);
+        up.$drop.bind('dragover',up.over);
+        up.$drop.bind('drop',up.drop);
+ 
+        //$('#status').click(up.cancel);
+ 
+        up.xhr = new XMLHttpRequest();
+        up.xhr.upload.addEventListener('progress', up.uploadProgress , false);
+        up.xhr.upload.addEventListener('load', up.uploadLoaded , false);
+ 
+    },
+ 
+    enter : function(e){
+        $(e.target).addClass('hover');
+        return false;
+    },
+ 
+    leave : function(e){
+        $(e.target).removeClass('hover');
+        return false;
+    },
+ 
+    over : function(e){
+        return false;
+    },
+ 
+    drop : function(e){
+        $(e.target).removeClass('hover');
+ 
+        var files = e.originalEvent.dataTransfer.files;
+        for (var i = 0; i<files.length; i++) {
+            var file = files[i];
+            up.queue.push(file);
+        }
+ 
+        if(up.uploading == false) {
+            up.uploading = true;
+            up.process();
+        }
+ 
+        return false;
+    },
+ 
+    process : function() {
+        up.processing = up.queue.shift();
+ 
+        if(window.FileReader) { //firefox 3.6, Chrome 6, Webkit
+ /*
+            if(up.processing.type.match(/image/gi) != null) { //is an image - read it
+                up.dataReader = new FileReader();
+                if(up.dataReader.addEventListener) { //firefox
+                    up.dataReader.addEventListener('loadend', up.binaryLoad, false);
+                    up.dataReader.addEventListener('error', up.loadError, false);
+                    up.dataReader.addEventListener('progress', up.loadProgress, false);
+                } else { //chrome / webkit
+                    up.dataReader.onloadend = up.binaryLoad;
+                    up.dataReader.onerror = up.loadError;
+                    up.dataReader.onprogress = up.loadProgress;
+                }
+                up.dataReader.readAsDataURL(up.processing);
+                console.info("up.processing",up.processing)
+            }
+*/ 
+            up.binaryReader = new FileReader();
+            if(up.binaryReader.addEventListener) { //firefox
+                up.binaryReader.addEventListener('loadend', up.binaryLoad, false);
+                up.binaryReader.addEventListener('error', up.loadError, false);
+                up.binaryReader.addEventListener('progress', up.loadProgress, false);
+            } else { //chrome / webkit
+                up.binaryReader.onloadend = up.binaryLoad;
+                up.binaryReader.onerror = up.loadError;
+                up.binaryReader.onprogress = up.loadProgress;
+            }
+            up.binaryReader.readAsBinaryString(up.processing);
+ 
+        } else { // safari 5 + others?
+ 
+            up.xhr.abort(); //make sure xhr is a new request
+			alert('Unsupport Browser!');
+/*
+            up.xhr.open('POST', '/html5_upload.php?up=true', true);
+ 
+            up.xhr.setRequestHeader('UP-FILENAME', up.processing.name);
+            up.xhr.setRequestHeader('UP-SIZE', up.processing.size);
+            up.xhr.setRequestHeader('UP-TYPE', up.processing.type);
+ 
+            up.xhr.send(up.processing);
+            up.xhr.onload = up.onload;
+*/
+        }
+ 
+    },
+ 
+    loadError : function(e) {
+        switch(e.target.error.code) {
+            case e.target.error.NOT_FOUND_ERR:
+                alert('File Not Found!');
+            break;
+            case e.target.error.NOT_READABLE_ERR:
+                alert('File is not readable');
+            break;
+            case e.target.error.ABORT_ERR:
+            break;
+            default:
+                alert('An error occurred reading this file.');
+        };
+ 
+    },
+ 
+    loadProgress : function(e) {
+        if (e.lengthComputable) {
+            var percentage = Math.round((e.loaded * 100) / e.total);
+            //$('#status').html('loaded: '+percentage+'%');
+        }
+    },
+ 
+    binaryLoad : function(e) {
+ 
+        //var isimage = (up.processing.type.match(/image/gi)!=null);
+        //if( isimage && up.dataReader.readyState == 2 && up.$drop.find('div:last').css('background-image')=='none') {
+        //    up.$drop.find('div:last').css('background-image','url(' + up.dataReader.result + ')');
+        //}
+ 
+        //if(isimage && up.dataReader.readyState == 2 && up.binaryReader.readyState == 2 || !isimage && up.binaryReader.readyState == 2 ) {
+		if(up.binaryReader.readyState == 2 ) {
+            up.xhr.abort(); //make sure xhr is a new request
+ 
+            var binary = e.target.result;
+            console.info("binary",e)
+            if(up.xhr.sendAsBinary != null) { //firefox
+ 
+                up.xhr.open('POST', '/upload?up=true', true);
+ 
+                var boundary = 'xxxxxxxxx';
+ 
+                var body = '--' + boundary + "\r\n";
+                body += "Content-Disposition: form-data; name='upload'; filename=\"" + up.processing.name + "\"\r\n";
+                body += "Content-Type: application/octet-stream\r\n\r\n";
+                body += binary + "\r\n";
+                body += '--' + boundary + '--';
+ 
+                up.xhr.setRequestHeader('content-type', 'multipart/form-data; boundary=' + boundary);
+                up.xhr.sendAsBinary(body);
+ 
+            } else { //for browsers that don't support sendAsBinary yet
+				alert('Unsupport Browser!');
+/* 
+                up.xhr.open('POST', './upload?up=true&base64=true', true);
+ 
+                up.xhr.setRequestHeader('UP-FILENAME', up.processing.name);
+                up.xhr.setRequestHeader('UP-SIZE', up.processing.size);
+                up.xhr.setRequestHeader('UP-TYPE', up.processing.type);
+ 
+                up.xhr.send(window.btoa(binary));
+*/
+            }
+ 
+            up.xhr.onload = up.onload;
+ 
+        }
+    },
+ 
+    uploadProgress : function(e) {
+        if (e.lengthComputable) {
+            var percentage = Math.round((e.loaded * 100) / e.total);
+            $('#status').text('Uploaded: '+percentage+'%');
+        }
+    },
+ 
+    uploadLoaded : function(e) {
+        $('#status').text('Uploaded: 100%');
+    },
+ 
+    onload : function (e) {
+		json_result  = eval("("+up.xhr.responseText+")");
+		formatjson(json_result);	
+        if(up.queue.length > 0) {
+            up.process();
+        } else {
+            up.uploading = false;
+            $('#status').text('Queue Uploaded');
+        }
+    },
+ 
+    cancel : function(e) {
+        if(up.dataReader) {
+            up.dataReader.abort();
+        }
+        if(up.dataReader) {
+            up.binaryReader.abort();
+        }
+        if(up.xhr) {
+            up.xhr.abort();
+        }
+        up.uploading = false;
+        up.queue = [];
+        up.processing = null;
+        $('#status').text('Drag and Drop files to begin...');
+        return false;
+    }
+ 
+}
+ 
+$(up.init);
+ 
+</script>
+</body>
+</html>
